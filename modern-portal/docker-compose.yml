@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Modern Node.js/TypeScript API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: portal_backend
+    restart: always
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DB_SERVER: host.docker.internal # Connects to host SQL Server
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: YourPasswordHere
+      DB_DATABASE: PortalDb
+      JWT_SECRET: super-strong-production-secret-token
+      W3_PORTAL_URL: https://w3infotech.com
+      W3_RESELLER_USER: your_w3infotech_reseller_username
+      W3_RESELLER_PASSWORD: your_w3infotech_reseller_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_ENABLED: "true"
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+
+  # React / Vite Static Client served via Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: portal_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  # Redis for BullMQ background task processing
+  redis:
+    image: redis:7-alpine
+    container_name: portal_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
