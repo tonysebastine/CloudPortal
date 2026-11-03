@@ -132,7 +132,7 @@ export class W3InfotechResellerBridge {
 
     // Initialize balance from config if not already tracked
     if (this.cachedBalance === null) {
-      this.cachedBalance = config.initialBalance ?? 25000;
+      this.cachedBalance = config.initialBalance ?? 0;
     }
 
     return {
@@ -155,11 +155,20 @@ export class W3InfotechResellerBridge {
     console.log(`📡 [W3Bridge] Submitting registration for ${cleanDomain} (${years} yr)...`);
 
     if (this.cachedBalance === null) {
-      this.cachedBalance = config.initialBalance ?? 25000;
+      this.cachedBalance = config.initialBalance ?? 0;
+    }
+
+    const cost = 599 * years;
+    if (this.cachedBalance < cost) {
+      return {
+        success: false,
+        domain: cleanDomain,
+        referenceId: '',
+        message: `Insufficient W3Infotech Reseller credit balance (Available: ₹${this.cachedBalance}, Required: ₹${cost}). Please add funds to upstream account.`,
+      };
     }
 
     // Debit reseller credit
-    const cost = 599 * years;
     this.cachedBalance = Math.max(0, this.cachedBalance - cost);
     this.lastSyncTime = new Date().toISOString();
 
@@ -184,10 +193,19 @@ export class W3InfotechResellerBridge {
     const cleanDomain = domain.toLowerCase().trim();
 
     if (this.cachedBalance === null) {
-      this.cachedBalance = config.initialBalance ?? 25000;
+      this.cachedBalance = config.initialBalance ?? 0;
     }
 
     const cost = 599 * years;
+    if (this.cachedBalance < cost) {
+      return {
+        success: false,
+        domain: cleanDomain,
+        referenceId: '',
+        message: `Insufficient W3Infotech Reseller credit balance (Available: ₹${this.cachedBalance}, Required: ₹${cost}). Please add funds to upstream account.`,
+      };
+    }
+
     this.cachedBalance = Math.max(0, this.cachedBalance - cost);
     this.lastSyncTime = new Date().toISOString();
 
