@@ -100,19 +100,17 @@ export async function getUpstreamStatus(req: AuthenticatedRequest, res: Response
     const { getW3ResellerConfig } = await import('../domains/upstream/w3infotech.config.js');
     const { w3ResellerBridge } = await import('../domains/upstream/w3infotech-reseller.service.js');
     const config = getW3ResellerConfig();
+    const bridgeStatus = await w3ResellerBridge.getStatus();
 
-    // Check if real credentials are provided
-    const isConfigured = Boolean(config.username && config.password);
+    const isConfigured = Boolean((config.username && config.password) || config.sessionCookie);
 
     return res.json({
       status: {
-        connected: isConfigured,
-        username: config.username || 'Not configured',
-        creditBalance: config.initialBalance || 0,
-        currency: 'INR',
-        lastSync: new Date().toISOString(),
+        ...bridgeStatus,
         note: isConfigured 
-          ? 'Live Reseller account configured for automated order dispatching'
+          ? (config.sessionCookie 
+              ? 'Live W3Infotech authenticated session active via session cookie' 
+              : 'Live Reseller account configured for automated order dispatching')
           : 'Please set W3_RESELLER_USER and W3_RESELLER_PASSWORD in .env',
       },
     });
