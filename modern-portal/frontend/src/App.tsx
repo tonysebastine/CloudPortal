@@ -456,6 +456,36 @@ export function App() {
             </button>
           </form>
 
+          {/* Quick Demo Login Preset Buttons for easy testing */}
+          {isLogin && (
+            <div className="mt-5 pt-4 border-t border-slate-100">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Sign-In Presets</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setEmail('admin@cloudportal.local'); setPassword('Admin@12345'); }}
+                  className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-purple-50 hover:text-purple-700 text-slate-700 font-medium rounded border border-slate-200 transition"
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEmail('reseller@cloudportal.local'); setPassword('User@12345'); }}
+                  className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-sky-50 hover:text-sky-700 text-slate-700 font-medium rounded border border-slate-200 transition"
+                >
+                  Reseller
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEmail('customer@cloudportal.local'); setPassword('User@12345'); }}
+                  className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 font-medium rounded border border-slate-200 transition"
+                >
+                  Customer
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-6 text-center text-sm text-slate-600">
             {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
             <button
