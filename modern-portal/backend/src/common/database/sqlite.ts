@@ -34,7 +34,10 @@ export async function initLocalDevDb() {
       GSTIN TEXT DEFAULT '',
       State TEXT DEFAULT '',
       StateCode INTEGER DEFAULT 0,
-      ParentId INTEGER DEFAULT 0
+      ParentId INTEGER DEFAULT 0,
+      KYCStatus TEXT DEFAULT 'not_submitted', -- 'not_submitted', 'pending', 'verified', 'rejected'
+      KYCMethod TEXT DEFAULT 'none',          -- 'digio', 'aadhaar', 'manual', 'none'
+      KYCVerifiedAt TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS SupportTickets (
@@ -150,6 +153,11 @@ export async function initLocalDevDb() {
       Created TEXT
     );
   `);
+
+  // Safe Alter Column Migrations for SQLite
+  try { sqlite.exec("ALTER TABLE Users ADD COLUMN KYCStatus TEXT DEFAULT 'not_submitted'"); } catch (e) {}
+  try { sqlite.exec("ALTER TABLE Users ADD COLUMN KYCMethod TEXT DEFAULT 'none'"); } catch (e) {}
+  try { sqlite.exec("ALTER TABLE Users ADD COLUMN KYCVerifiedAt TEXT DEFAULT ''"); } catch (e) {}
 
   // Seed default admin and demo user if not present
   const adminCheck = sqlite.prepare('SELECT Id FROM Users WHERE Email = ?').get('admin@cloudportal.local');

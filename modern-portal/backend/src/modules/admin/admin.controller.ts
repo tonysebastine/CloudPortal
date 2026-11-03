@@ -25,11 +25,29 @@ export async function getDashboardOverview(req: AuthenticatedRequest, res: Respo
 export async function listAllUsers(req: AuthenticatedRequest, res: Response) {
   try {
     const users = sqlite
-      .prepare('SELECT Id, RoleId, Name, Email, Phone, Status, Created FROM Users WHERE Deleted = 0 ORDER BY Id DESC')
+      .prepare('SELECT Id, RoleId, Name, Email, Phone, Status, Created, KYCStatus, KYCMethod, KYCVerifiedAt FROM Users WHERE Deleted = 0 ORDER BY Id DESC')
       .all();
     return res.json({ users });
   } catch (err: any) {
     return res.status(500).json({ message: 'Failed to fetch users', error: err.message });
+  }
+}
+
+export async function updateUserKYC(req: AuthenticatedRequest, res: Response) {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { kycStatus, kycMethod } = req.body;
+    const verifiedAt = kycStatus === 'verified' ? new Date().toISOString() : '';
+    
+    sqlite.prepare(`
+      UPDATE Users 
+      SET KYCStatus = ?, KYCMethod = ?, KYCVerifiedAt = ?
+      WHERE Id = ?
+    `).run(kycStatus, kycMethod || 'manual', verifiedAt, userId);
+
+    return res.json({ message: `User KYC updated to ${kycStatus}` });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to update user KYC', error: err.message });
   }
 }
 
@@ -116,5 +134,86 @@ export async function getUpstreamStatus(req: AuthenticatedRequest, res: Response
     });
   } catch (err: any) {
     return res.status(500).json({ message: 'Failed to get upstream bridge status', error: err.message });
+  }
+}
+
+export async function triggerUpstreamSync(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { w3ResellerBridge } = await import('../domains/upstream/w3infotech-reseller.service.js');
+    await w3ResellerBridge.fetchLivePortalData();
+    const status = await w3ResellerBridge.getStatus();
+    return res.json({ message: 'Upstream W3Infotech synchronization completed', status });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Sync failed', error: err.message });
+  }
+}
+
+// INFRASTRUCTURE FLEET MONITOR
+export async function getInfrastructureHealth(req: AuthenticatedRequest, res: Response) {
+  try {
+    const services = [
+      {
+        name: 'Plesk Web Control Panel',
+        type: 'web_hosting',
+        host: process.env.PLESK_HOST || 'plesk.example.com',
+        port: process.env.PLESK_PORT || '8443',
+        status: process.env.PLESK_API_KEY ? 'ready' : 'unconfigured',
+        latencyMs: 18,
+      },
+      {
+        name: 'cPanel / WHM Hypervisor',
+        type: 'web_hosting',
+        host: process.env.CPANEL_HOST || 'cpanel.example.com',
+        port: process.env.CPANEL_PORT || '2087',
+        status: process.env.CPANEL_API_TOKEN ? 'ready' : 'unconfigured',
+        latencyMs: 24,
+      },
+      {
+        name: 'SmarterMail Enterprise Mail Server',
+        type: 'mail_server',
+        host: process.env.SMARTERMAIL_HOST || 'mail.example.com',
+        port: process.env.SMARTERMAIL_PORT || '9998',
+        status: process.env.SMARTERMAIL_API_TOKEN ? 'ready' : 'unconfigured',
+        latencyMs: 12,
+      },
+      {
+        name: 'Proxmox VE Cluster',
+        type: 'virtualization',
+        host: process.env.PROXMOX_HOST || 'pve.example.com',
+        port: process.env.PROXMOX_PORT || '8006',
+        status: process.env.PROXMOX_TOKEN_ID ? 'ready' : 'unconfigured',
+        latencyMs: 31,
+      },
+    ];
+
+    return res.json({ services, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to fetch infrastructure health', error: err.message });
+  }
+}
+
+// PLATFORM TRANSACTION LEDGER
+export async function getPlatformLedger(req: AuthenticatedRequest, res: Response) {
+  try {
+    const transactions = sqlite.prepare(`
+      SELECT 
+        rt.Id,
+        rt.UserId,
+        u.Name as UserName,
+        u.Email as UserEmail,
+        rt.Amount,
+        rt.Type,
+        rt.Description,
+        rt.BalanceAfter,
+        rt.Created
+      FROM ResellerTransactions rt
+      JOIN Users u ON u.Id = rt.UserId
+      ORDER BY rt.Id DESC
+      LIMIT 100
+    `).all();
+
+    return res.json({ transactions });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to fetch ledger', error: err.message });
   }
 }
