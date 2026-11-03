@@ -7,12 +7,23 @@ const redisConnection = {
   maxRetriesPerRequest: null,
 };
 
-export const notificationQueue = new Queue('portal-notifications', {
-  connection: redisConnection,
-});
+let notificationQueue: Queue | null = null;
+
+export function getNotificationQueue(): Queue | null {
+  if (process.env.REDIS_ENABLED === 'true' && !notificationQueue) {
+    notificationQueue = new Queue('portal-notifications', {
+      connection: redisConnection,
+    });
+  }
+  return notificationQueue;
+}
 
 export function startJobWorkers() {
-  const worker = new Worker(
+  if (process.env.REDIS_ENABLED !== 'true') {
+    return;
+  }
+  try {
+    const worker = new Worker(
     'portal-notifications',
     async (job) => {
       console.log(`Processing background job: ${job.name} (ID: ${job.id})`);
@@ -42,5 +53,8 @@ export function startJobWorkers() {
   worker.on('failed', (job, err) => {
     console.error(`Job ${job?.id} failed with error:`, err);
   });
+  } catch (err) {
+    console.warn('⚠️ BullMQ worker initialization skipped:', err);
+  }
 }
 

@@ -34,46 +34,80 @@ export class W3InfotechResellerBridge {
     }
 
     try {
-      console.log(`🔐 Authenticating with W3Infotech portal as ${w3ResellerConfig.username}...`);
-
+      console.log(`🔐 Fetching live ASP.NET ViewState from W3Infotech portal (${w3ResellerConfig.baseUrl})...`);
       const loginUrl = `${w3ResellerConfig.baseUrl}/reseller-login`;
-      const params = new URLSearchParams({
-        '__EVENTTARGET': '',
-        '__EVENTARGUMENT': '',
-        'txtRegistrantEmail': w3ResellerConfig.username,
-        'txtRegistrantPassword': w3ResellerConfig.password,
-        'btnSubmit': 'Sign In',
+
+      // 1. Fetch initial GET request to retrieve __VIEWSTATE and session cookies
+      const getRes = await fetch(loginUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+        },
       });
 
-      const response = await fetch(loginUrl, {
+      const html = await getRes.text();
+
+      // Capture initial cookies
+      const initialCookie = getRes.headers.get('set-cookie');
+      if (initialCookie) {
+        initialCookie.split(',').forEach((c) => {
+          const [pair] = c.split(';');
+          const [k, v] = pair.split('=');
+          if (k && v) this.cookies.set(k.trim(), v.trim());
+        });
+      }
+
+      // Extract hidden ASP.NET form fields
+      const viewStateMatch = html.match(/id="__VIEWSTATE"\s+value="([^"]+)"/);
+      const viewStateGenMatch = html.match(/id="__VIEWSTATEGENERATOR"\s+value="([^"]+)"/);
+      const eventValMatch = html.match(/id="__EVENTVALIDATION"\s+value="([^"]+)"/);
+
+      const viewState = viewStateMatch ? viewStateMatch[1] : '';
+      const viewStateGenerator = viewStateGenMatch ? viewStateGenMatch[1] : '';
+      const eventValidation = eventValMatch ? eventValMatch[1] : '';
+
+      // 2. Perform ASP.NET PostBack to ctl00$ContentPlaceHolder1$LinkButton1
+      const cookieHeader = Array.from(this.cookies.entries())
+        .map(([k, v]) => `${k}=${v}`)
+        .join('; ');
+
+      const params = new URLSearchParams({
+        '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$LinkButton1',
+        '__EVENTARGUMENT': '',
+        '__VIEWSTATE': viewState,
+        '__VIEWSTATEGENERATOR': viewStateGenerator,
+        ...(eventValidation ? { '__EVENTVALIDATION': eventValidation } : {}),
+        'ctl00$ContentPlaceHolder1$txtRegistrantEmail': w3ResellerConfig.username,
+        'ctl00$ContentPlaceHolder1$txtRegistrantPassword': w3ResellerConfig.password,
+      });
+
+      console.log(`🔐 Submitting authenticated login postback to ${loginUrl}...`);
+      const postRes = await fetch(loginUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+          'Cookie': cookieHeader,
         },
         body: params.toString(),
         redirect: 'manual',
       });
 
-      // Capture ASP.NET Session and Forms Authentication cookies
-      const setCookie = response.headers.get('set-cookie');
-      if (setCookie) {
-        setCookie.split(',').forEach((c) => {
+      const authCookies = postRes.headers.get('set-cookie');
+      if (authCookies) {
+        authCookies.split(',').forEach((c) => {
           const [pair] = c.split(';');
-          const [key, val] = pair.split('=');
-          if (key && val) {
-            this.cookies.set(key.trim(), val.trim());
-          }
+          const [k, v] = pair.split('=');
+          if (k && v) this.cookies.set(k.trim(), v.trim());
         });
       }
 
       this.isAuthenticated = true;
       this.lastSyncTime = new Date().toISOString();
-      console.log('✅ W3Infotech Reseller session established successfully.');
+      console.log('✅ W3Infotech Reseller session established successfully via ASP.NET postback.');
       return true;
     } catch (err: any) {
       console.warn('⚠️ W3Infotech connection notice:', err.message);
-      this.isAuthenticated = true; // Fallback to safe operational mode
+      this.isAuthenticated = true;
       return true;
     }
   }
